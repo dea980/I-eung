@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>로그인 시스템</title>
+  </head>
+  <body>
+    <h1>로그인 시스템</h1>
+    <div>
+      <h2>네이버 로그인</h2>
+      <a
+        href="https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=dCcgMbMXnKAL26MolO5S&redirect_uri=http://localhost:8080/oauth/redirect_url&state=1234"
+      >
+        네이버 로그인
+      </a>
+    </div>
+    <script>
+      document.querySelector("a").addEventListener("click", function (event) {
+        event.preventDefault(); // 기본 링크 동작 방지
+        const url = this.href; // 로그인 URL
+        window.location.href = url; // OAuth 인증 페이지로 리다이렉트
+      });
+    </script>
+  </body>
+</html>
