@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api, { Recipe } from '../api/client';
+import api from '../api/client';
+import { Recipe } from '../types';
 import RecipeCard from '../components/RecipeCard';
 
 const Profile: React.FC = () => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import api, { Recipe, Ingredient, Tool } from '../api/client';
+import api from '../api/client';
+import { Recipe, Ingredient, Tool } from '../types';
 import RecipeCard from '../components/RecipeCard';
 
 interface RecipeRecommendation {

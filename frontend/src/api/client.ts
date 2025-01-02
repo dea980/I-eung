@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Recipe, Ingredient, Tool } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -18,31 +19,8 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-// API 타입 정의
-export interface Recipe {
-  id: number;
-  name: string;
-  instructions: string;
-  cooking_time: number;
-  difficulty: string;
-  is_ai_generated: boolean;
-}
-
-export interface Ingredient {
-  id: number;
-  name: string;
-  quantity?: number;
-  unit?: string;
-  price?: number;
-}
-
-export interface Tool {
-  id: number;
-  name: string;
-}
-
 // API 함수들
-export const api = {
+const api = {
   // 사용자 관련
   login: async (email: string, password: string) => {
     const response = await client.post('/users/login', { email, password });

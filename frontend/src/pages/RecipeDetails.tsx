@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api, { Recipe } from '../api/client';
+import api from '../api/client';
+import { Recipe, RecipeIngredient, RecipeTool } from '../types';
 
 interface RecipeDetailsProps {}
 
@@ -53,11 +54,11 @@ const RecipeDetails: React.FC<RecipeDetailsProps> = () => {
     try {
       setAddingToShoppingList(true);
       // 레시피의 모든 재료를 장보기 목록에 추가
-      for (const ingredient of recipe.ingredients) {
+      for (const recipeIngredient of recipe.ingredients) {
         await api.addToShoppingList(user.id, {
-          ingredient_id: ingredient.id,
-          quantity: ingredient.quantity,
-          unit: ingredient.unit,
+          ingredient_id: recipeIngredient.ingredient.id,
+          quantity: recipeIngredient.quantity,
+          unit: recipeIngredient.unit,
         });
       }
       alert('장보기 목록에 추가되었습니다.');
@@ -133,11 +134,11 @@ const RecipeDetails: React.FC<RecipeDetailsProps> = () => {
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">필요한 재료</h2>
           <ul className="grid grid-cols-2 gap-4">
-            {recipe.ingredients.map((ingredient, index) => (
+            {recipe.ingredients.map((recipeIngredient, index) => (
               <li key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded">
-                <span className="font-medium">{ingredient.name}</span>
+                <span className="font-medium">{recipeIngredient.ingredient.name}</span>
                 <span className="text-gray-600">
-                  {ingredient.quantity} {ingredient.unit}
+                  {recipeIngredient.quantity} {recipeIngredient.unit}
                 </span>
               </li>
             ))}
@@ -147,9 +148,9 @@ const RecipeDetails: React.FC<RecipeDetailsProps> = () => {
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">필요한 도구</h2>
           <ul className="grid grid-cols-2 gap-4">
-            {recipe.tools.map((tool, index) => (
+            {recipe.tools.map((recipeTool, index) => (
               <li key={index} className="bg-gray-50 p-3 rounded">
-                {tool.name}
+                {recipeTool.tool.name}
               </li>
             ))}
           </ul>
