@@ -1,12 +1,19 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Float, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
+import httpx
+import jwt
+from backend.oauth_config import OAuthConfig
 
 app = FastAPI()
+
+# OAuth routes
+from backend.oauth_routes import router as oauth_router
+app.include_router(oauth_router, prefix="/api")
 
 # 데이터베이스 설정
 DATABASE_URL = "mysql+pymysql://user:password@localhost/recipe_db"
@@ -36,7 +43,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), index=True)
     email = Column(String(100), unique=True, index=True)
-    password = Column(String(100))
+    password = Column(String(100), nullable=True)  # OAuth 사용자는 비밀번호가 없을 수 있음
+    oauth_provider = Column(String(50), nullable=True)  # OAuth 제공자 (google, naver, kakao, meta)
+    oauth_id = Column(String(200), nullable=True)  # OAuth 제공자의 사용자 ID
+    profile_image = Column(String(500), nullable=True)  # 프로필 이미지 URL
     favorite_recipes = relationship("Recipe", secondary=favorites, back_populates="favorited_by")  # 즐겨찾기한 레시피들
     shopping_items = relationship("Ingredient", secondary=shopping_list)  # 장보기 목록의 재료들
 
@@ -134,6 +144,27 @@ class ShoppingListItem(BaseModel):
     ingredient_id: int
     quantity: float
     unit: str
+
+# OAuth 관련 모델
+class OAuthCallback(BaseModel):
+    code: str
+    state: Optional[str] = None
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: Optional[int] = None
+    refresh_token: Optional[str] = None
+
+class OAuthUserInfo(BaseModel):
+    id: str
+    email: str
+    name: str
+    profile_image: Optional[str] = None
+
+# JWT 설정
+JWT_SECRET = "your-secret-key"  # 실제 운영 환경에서는 환경 변수로 관리
+JWT_ALGORITHM = "HS256"
 
 # 데이터베이스 세션 의존성
 def get_db():
@@ -356,6 +387,154 @@ def generate_recipe(ingredients: List[str], db: SessionLocal = Depends(get_db)):
     db.refresh(new_recipe)
     
     return new_recipe
+
+# 로그인 라우트
+@app.post("/api/login")
+async def login(email: str, password: str, db: SessionLocal = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.password:  # OAuth 사용자는 비밀번호가 없을 수 있음
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 잘못되었습니다")
+    
+    # 실제 구현에서는 비밀번호 해싱 검증 필요
+    if user.password != password:
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 잘못되었습니다")
+    
+    token = jwt.encode(
+        {
+            "sub": str(user.id),
+            "email": user.email,
+            "name": user.name
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM
+    )
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "profile_image": user.profile_image
+        }
+    }
+
+# OAuth 콜백 라우트
+@app.post("/api/oauth/{provider}/callback")
+async def oauth_callback(
+    provider: str,
+    callback_data: OAuthCallback,
+    request: Request,
+    db: SessionLocal = Depends(get_db)
+):
+    try:
+        provider_config = OAuthConfig.get_provider_config(provider)
+        
+        # Access 토큰 얻기
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                provider_config["token_url"],
+                data={
+                    "grant_type": "authorization_code",
+                    "code": callback_data.code,
+                    "client_id": provider_config["client_id"],
+                    "client_secret": provider_config["client_secret"],
+                    "redirect_uri": OAuthConfig.get_redirect_uri(provider, str(request.base_url))
+                }
+            )
+            token_data = token_response.json()
+
+        # 사용자 정보 얻기
+        headers = {"Authorization": f"Bearer {token_data['access_token']}"}
+        if provider == "naver":
+            headers["Authorization"] = f"Bearer {token_data['access_token']}"
+        elif provider == "kakao":
+            headers["Authorization"] = f"Bearer {token_data['access_token']}"
+
+        async with httpx.AsyncClient() as client:
+            user_response = await client.get(
+                provider_config["userinfo_url"],
+                headers=headers,
+                params={"fields": "id,name,email,picture"} if provider == "meta" else None
+            )
+            user_info = user_response.json()
+
+        # 제공자별 사용자 정보 매핑
+        oauth_id = None
+        email = None
+        name = None
+        profile_image = None
+
+        if provider == "google":
+            oauth_id = user_info["sub"]
+            email = user_info["email"]
+            name = user_info["name"]
+            profile_image = user_info.get("picture")
+        elif provider == "naver":
+            user_info = user_info["response"]
+            oauth_id = user_info["id"]
+            email = user_info["email"]
+            name = user_info["name"]
+            profile_image = user_info.get("profile_image")
+        elif provider == "kakao":
+            oauth_id = str(user_info["id"])
+            account = user_info["kakao_account"]
+            email = account.get("email")
+            name = account["profile"].get("nickname")
+            profile_image = account["profile"].get("profile_image_url")
+        elif provider == "meta":
+            oauth_id = user_info["id"]
+            email = user_info.get("email")
+            name = user_info.get("name")
+            profile_image = user_info.get("picture", {}).get("data", {}).get("url")
+
+        # 사용자 찾기 또는 생성
+        user = db.query(User).filter(
+            User.oauth_provider == provider,
+            User.oauth_id == oauth_id
+        ).first()
+
+        if not user:
+            user = User(
+                oauth_provider=provider,
+                oauth_id=oauth_id,
+                email=email,
+                name=name,
+                profile_image=profile_image
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        # JWT 토큰 생성
+        token = jwt.encode(
+            {
+                "sub": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "oauth_provider": user.oauth_provider
+            },
+            JWT_SECRET,
+            algorithm=JWT_ALGORITHM
+        )
+
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "profile_image": user.profile_image
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"OAuth 인증 실패: {str(e)}"
+        )
 
 if __name__ == "__main__":
     Base.metadata.create_all(bind=engine)

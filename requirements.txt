@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+pymysql
+python-dotenv
+httpx>=0.24.0
+pyjwt>=2.7.0
+requests>=2.31.0
+fastapi==0.104.1
+uvicorn==0.24.0
+sqlalchemy==2.0.23
+pymysql==1.1.0
+python-dotenv==1.0.0
+pydantic==2.5.2
+cryptography==41.0.5
