@@ -51,9 +51,21 @@ I-eung은 레시피 관리와 쇼핑 리스트 기능을 제공하는 웹 애플
 └── requirements.txt      # Python 의존성 패키지
 ```
 
-## 설치 및 실행 방법
+## 프로젝트 실행 방법
 
-### 백엔드 설정
+### 1. 환경 변수 설정
+프로젝트 루트에 `.env` 파일을 생성하고 다음 환경 변수를 설정하세요:
+```
+# OAuth 설정
+OAUTH_CLIENT_ID=your_client_id
+OAUTH_CLIENT_SECRET=your_client_secret
+
+# 기타 설정
+API_BASE_URL=http://localhost:your_port
+```
+
+### 2. 백엔드 설정 및 실행
+첫 번째 터미널 창에서:
 ```bash
 # 가상 환경 생성 및 활성화
 python -m venv venv
@@ -66,7 +78,8 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 프론트엔드 설정
+### 3. 프론트엔드 설정 및 실행
+두 번째 터미널 창에서:
 ```bash
 # frontend 디렉토리로 이동
 cd frontend
@@ -78,16 +91,33 @@ npm install
 npm start
 ```
 
-## 환경 변수 설정
-프로젝트 루트에 `.env` 파일을 생성하고 다음 환경 변수를 설정하세요:
-```
-# OAuth 설정
-OAUTH_CLIENT_ID=your_client_id
-OAUTH_CLIENT_SECRET=your_client_secret
+### 4. 동시 실행을 위한 스크립트 (선택사항)
+프로젝트 루트에 `start.sh` (macOS/Linux) 또는 `start.bat` (Windows) 파일을 생성하여 한 번에 실행할 수 있습니다.
 
-# 기타 설정
-API_BASE_URL=http://localhost:your_port
+macOS/Linux (`start.sh`):
+```bash
+#!/bin/bash
+# 백엔드 실행
+source venv/bin/activate
+python main.py &
+
+# 프론트엔드 실행
+cd frontend && npm start
 ```
+
+Windows (`start.bat`):
+```batch
+@echo off
+:: 백엔드 실행
+start cmd /k "venv\Scripts\activate && python main.py"
+
+:: 프론트엔드 실행
+start cmd /k "cd frontend && npm start"
+```
+
+스크립트 실행 방법:
+- macOS/Linux: `chmod +x start.sh && ./start.sh`
+- Windows: `start.bat`
 
 ## API 문서
 자세한 API 명세는 `API설명서.md` 파일을 참조하세요.
