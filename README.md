@@ -53,18 +53,39 @@ I-eung은 레시피 관리와 쇼핑 리스트 기능을 제공하는 웹 애플
 
 ## 프로젝트 실행 방법
 
-### 1. 환경 변수 설정
+### Docker를 사용한 실행 (권장)
+1. 환경 변수 설정
 프로젝트 루트에 `.env` 파일을 생성하고 다음 환경 변수를 설정하세요:
 ```
 # OAuth 설정
-OAUTH_CLIENT_ID=your_client_id
-OAUTH_CLIENT_SECRET=your_client_secret
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+JWT_SECRET=your_jwt_secret
+DATABASE_URL=your_database_url
 
 # 기타 설정
-API_BASE_URL=http://localhost:your_port
+REACT_APP_API_URL=http://localhost:8000
 ```
 
-### 2. 백엔드 설정 및 실행
+2. Docker Compose로 실행
+```bash
+# 애플리케이션 빌드 및 실행
+docker-compose up --build
+
+# 백그라운드에서 실행하려면
+docker-compose up -d --build
+```
+
+3. 애플리케이션 접속
+- 프론트엔드: http://localhost
+- 백엔드 API: http://localhost:8000
+
+### 로컬 개발 환경에서 실행
+
+#### 1. 환경 변수 설정
+위의 Docker 설정과 동일한 `.env` 파일을 사용합니다.
+
+#### 2. 백엔드 설정 및 실행
 첫 번째 터미널 창에서:
 ```bash
 # 가상 환경 생성 및 활성화
@@ -78,7 +99,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 3. 프론트엔드 설정 및 실행
+#### 3. 프론트엔드 설정 및 실행
 두 번째 터미널 창에서:
 ```bash
 # frontend 디렉토리로 이동
@@ -91,7 +112,7 @@ npm install
 npm start
 ```
 
-### 4. 동시 실행을 위한 스크립트 (선택사항)
+#### 4. 동시 실행을 위한 스크립트 (선택사항)
 프로젝트 루트에 `start.sh` (macOS/Linux) 또는 `start.bat` (Windows) 파일을 생성하여 한 번에 실행할 수 있습니다.
 
 macOS/Linux (`start.sh`):
