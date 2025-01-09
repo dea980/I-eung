@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'rest_framework',  # Django REST framework
     'corsheaders',  # CORS headers
     'articles',  # Add our articles app
+    'recommandationManager',  # Add recommendation system app
 ]
 
 MIDDLEWARE = [
@@ -86,19 +87,28 @@ WSGI_APPLICATION = 'Recommand.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME', 'recommand_db'),
-        'USER': os.getenv('DB_USER', 'recommand_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'db'),
-        'PORT': os.getenv('DB_PORT', '3306'),
-        'OPTIONS': {
-            'charset': 'utf8mb4',
+# Use SQLite for local development when not in Docker
+if os.getenv('USE_DOCKER') == 'true':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME', 'recommand_db'),
+            'USER': os.getenv('DB_USER', 'recommand_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'db'),
+            'PORT': os.getenv('DB_PORT', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            }
         }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation

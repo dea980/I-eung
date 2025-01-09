@@ -3,12 +3,17 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Avg, Q, Sum
 from django.contrib.auth.models import User
-from .models import Category, Tag, Article, Comment, Rating, Like, Dislike
+from .models import (
+    Category, Tag, Article, Comment, Rating, Like, Dislike,
+    CookingTool, Ingredient, Recipe, RecipeStep, RecipeIngredient, CartItem
+)
 from .serializers import (
     CategorySerializer, TagSerializer, ArticleSerializer,
-    CommentSerializer, RatingSerializer, LikeSerializer, DislikeSerializer
+    CommentSerializer, RatingSerializer, LikeSerializer, DislikeSerializer,
+    CookingToolSerializer, IngredientSerializer, RecipeSerializer,
+    RecipeStepSerializer, RecipeIngredientSerializer, CartItemSerializer
 )
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -65,7 +70,6 @@ class ArticleViewSet(viewsets.ModelViewSet):
         if created:
             article.likes_count += 1
             article.save()
-            # Remove dislike if exists
             Dislike.objects.filter(article=article, user=request.user).delete()
             return Response({'status': 'liked'})
         return Response({'status': 'already liked'})
@@ -80,69 +84,9 @@ class ArticleViewSet(viewsets.ModelViewSet):
         if created:
             article.dislikes_count += 1
             article.save()
-            # Remove like if exists
             Like.objects.filter(article=article, user=request.user).delete()
             return Response({'status': 'disliked'})
         return Response({'status': 'already disliked'})
-
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
-    def rate(self, request, pk=None):
-        article = self.get_object()
-        value = request.data.get('value')
-        
-        if not value or not isinstance(value, int) or value < 1 or value > 5:
-            return Response(
-                {'error': 'Invalid rating value'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        rating, created = Rating.objects.update_or_create(
-            article=article,
-            user=request.user,
-            defaults={'value': value}
-        )
-        
-        return Response({'status': 'rated', 'value': value})
-
-    @action(detail=False, methods=['get'])
-    def recommended(self, request):
-        if not request.user.is_authenticated:
-            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Get user's liked articles
-        liked_articles = Article.objects.filter(likes__user=request.user)
-        
-        # Get tags from liked articles
-        liked_tags = Tag.objects.filter(articles__in=liked_articles).distinct()
-        
-        # Get categories from liked articles
-        liked_categories = Category.objects.filter(articles__in=liked_articles).distinct()
-        
-        # Find similar articles based on tags and categories
-        recommended = Article.objects.exclude(
-            id__in=liked_articles.values_list('id', flat=True)
-        ).filter(
-            Q(tags__in=liked_tags) | Q(category__in=liked_categories)
-        ).annotate(
-            avg_rating=Avg('ratings__value'),
-            like_count=Count('likes'),
-            relevance_score=Count('tags', filter=Q(tags__in=liked_tags)) + 
-                          Count('category', filter=Q(category__in=liked_categories))
-        ).order_by('-relevance_score', '-avg_rating', '-like_count')[:10]
-        
-        serializer = self.get_serializer(recommended, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=['get'])
-    def top_rated(self, request):
-        top_articles = Article.objects.annotate(
-            avg_rating=Avg('ratings__value')
-        ).filter(
-            avg_rating__isnull=False
-        ).order_by('-avg_rating', '-created_at')[:10]
-        
-        serializer = self.get_serializer(top_articles, many=True)
-        return Response(serializer.data)
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
@@ -155,9 +99,148 @@ class CommentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+# New viewsets for cooking and shopping features
+
+class CookingToolViewSet(viewsets.ModelViewSet):
+    queryset = CookingTool.objects.all()
+    serializer_class = CookingToolSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'description']
+
+class IngredientViewSet(viewsets.ModelViewSet):
+    queryset = Ingredient.objects.all()
+    serializer_class = IngredientSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'description']
+    ordering_fields = ['price', 'name']
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def add_to_cart(self, request, pk=None):
+        ingredient = self.get_object()
+        quantity = int(request.data.get('quantity', 1))
+
+        if quantity > ingredient.stock:
+            return Response(
+                {'error': f'재고가 부족합니다. 현재 재고: {ingredient.stock}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cart_item, created = CartItem.objects.get_or_create(
+            user=request.user,
+            ingredient=ingredient,
+            defaults={'quantity': quantity}
+        )
+
+        if not created:
+            cart_item.quantity += quantity
+            if cart_item.quantity > ingredient.stock:
+                return Response(
+                    {'error': f'재고가 부족합니다. 현재 재고: {ingredient.stock}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            cart_item.save()
+
+        return Response({'status': 'added to cart', 'quantity': cart_item.quantity})
+
+class RecipeViewSet(viewsets.ModelViewSet):
+    queryset = Recipe.objects.all()
+    serializer_class = RecipeSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'description', 'author__username']
+    ordering_fields = ['created_at', 'cooking_time', 'difficulty']
+
     def get_queryset(self):
-        queryset = Comment.objects.all()
-        article_id = self.request.query_params.get('article', None)
-        if article_id:
-            queryset = queryset.filter(article_id=article_id)
-        return queryset
+        queryset = Recipe.objects.all()
+        difficulty = self.request.query_params.get('difficulty', None)
+        max_time = self.request.query_params.get('max_time', None)
+        tool = self.request.query_params.get('tool', None)
+
+        if difficulty:
+            queryset = queryset.filter(difficulty=difficulty)
+        if max_time:
+            queryset = queryset.filter(cooking_time__lte=int(max_time))
+        if tool:
+            queryset = queryset.filter(tools__name=tool)
+
+        return queryset.distinct()
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def add_ingredients_to_cart(self, request, pk=None):
+        recipe = self.get_object()
+        serving_size = int(request.data.get('serving_size', 1))
+        
+        if serving_size < 1:
+            return Response(
+                {'error': '올바른 인분 수를 입력해주세요.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        recipe_ingredients = recipe.ingredients.all()
+        added_items = []
+        errors = []
+
+        for recipe_ingredient in recipe_ingredients:
+            required_quantity = recipe_ingredient.quantity * serving_size
+            ingredient = recipe_ingredient.ingredient
+
+            if required_quantity > ingredient.stock:
+                errors.append(f'{ingredient.name}: 재고 부족 (필요: {required_quantity}{recipe_ingredient.unit}, 재고: {ingredient.stock}{ingredient.unit})')
+                continue
+
+            cart_item, created = CartItem.objects.get_or_create(
+                user=request.user,
+                ingredient=ingredient,
+                defaults={'quantity': required_quantity}
+            )
+
+            if not created:
+                cart_item.quantity += required_quantity
+                if cart_item.quantity > ingredient.stock:
+                    errors.append(f'{ingredient.name}: 재고 부족 (필요: {cart_item.quantity}{recipe_ingredient.unit}, 재고: {ingredient.stock}{ingredient.unit})')
+                    continue
+                cart_item.save()
+
+            added_items.append(f'{ingredient.name}: {required_quantity}{recipe_ingredient.unit}')
+
+        response_data = {
+            'added_items': added_items,
+            'errors': errors
+        }
+
+        if errors:
+            response_data['status'] = 'partially_added'
+        else:
+            response_data['status'] = 'all_added'
+
+        return Response(response_data)
+
+class CartItemViewSet(viewsets.ModelViewSet):
+    serializer_class = CartItemSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at']
+
+    def get_queryset(self):
+        return CartItem.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        cart_items = self.get_queryset()
+        total_price = sum(item.total_price for item in cart_items)
+        
+        return Response({
+            'total_items': cart_items.count(),
+            'total_price': total_price,
+            'items': CartItemSerializer(cart_items, many=True).data
+        })
+
+    @action(detail=False, methods=['post'])
+    def clear(self, request):
+        self.get_queryset().delete()
+        return Response({'status': 'cart cleared'})
