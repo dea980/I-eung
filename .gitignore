@@ -43,4 +43,4 @@ media/
 
 # Database
 *.db
-postgres_data/
+postgres_data/.venv
