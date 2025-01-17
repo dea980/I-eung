@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from django.views.generic import RedirectView
 from articles.views import (
     CategoryViewSet, TagViewSet, ArticleViewSet, CommentViewSet,
     CookingToolViewSet, IngredientViewSet, RecipeViewSet, CartItemViewSet
@@ -25,6 +26,7 @@ router.register(r'recipe-interactions', UserRecipeInteractionViewSet, basename='
 
 # API URLs
 urlpatterns = [
+    path('', RedirectView.as_view(url='/api/', permanent=False)),  # Redirect root to API root
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     # Include auth URLs for browsable API

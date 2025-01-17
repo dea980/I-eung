@@ -1,119 +1,133 @@
-# 게시글 추천 시스템 API
+# 레시피 추천 시스템
 
-사용자 선호도 기반의 게시글 추천 기능이 포함된 Django REST API 시스템입니다.
+## 시작하기
 
-## 주요 기능
+이 프로젝트는 Django와 Django REST Framework를 사용하여 구현된 레시피 추천 시스템입니다.
 
-- 게시글, 댓글, 카테고리, 태그에 대한 전체 CRUD 작업
-- 사용자 인증 및 권한 관리
-- 사용자 선호도 기반 게시글 추천 시스템
-- 좋아요/싫어요 기능
-- 평점 시스템
-- 검색 및 필터링 기능
-- 페이지네이션 지원
+### 필수 요구사항
 
-## API 엔드포인트
+- Python 3.12 이상
+- pip (Python 패키지 관리자)
 
-### 게시글
-- `GET /api/articles/` - 전체 게시글 목록
-- `POST /api/articles/` - 새 게시글 작성
-- `GET /api/articles/{id}/` - 특정 게시글 조회
-- `PUT /api/articles/{id}/` - 게시글 수정
-- `DELETE /api/articles/{id}/` - 게시글 삭제
-- `POST /api/articles/{id}/like/` - 게시글 좋아요
-- `POST /api/articles/{id}/dislike/` - 게시글 싫어요
-- `POST /api/articles/{id}/rate/` - 게시글 평가
-- `GET /api/articles/recommended/` - 개인화된 게시글 추천
-- `GET /api/articles/top_rated/` - 최고 평점 게시글
+### 설치 방법
 
-### 카테고리
-- `GET /api/categories/` - 전체 카테고리 목록
-- `POST /api/categories/` - 새 카테고리 생성
-- `GET /api/categories/{id}/` - 특정 카테고리 조회
-- `PUT /api/categories/{id}/` - 카테고리 수정
-- `DELETE /api/categories/{id}/` - 카테고리 삭제
-
-### 태그
-- `GET /api/tags/` - 전체 태그 목록
-- `POST /api/tags/` - 새 태그 생성
-- `GET /api/tags/{id}/` - 특정 태그 조회
-- `PUT /api/tags/{id}/` - 태그 수정
-- `DELETE /api/tags/{id}/` - 태그 삭제
-
-### 댓글
-- `GET /api/comments/` - 전체 댓글 목록
-- `POST /api/comments/` - 새 댓글 작성
-- `GET /api/comments/{id}/` - 특정 댓글 조회
-- `PUT /api/comments/{id}/` - 댓글 수정
-- `DELETE /api/comments/{id}/` - 댓글 삭제
-
-## 설치 및 실행
-
-1. 저장소 클론:
+1. 필요한 패키지 설치:
 ```bash
-git clone <저장소-URL>
-cd I-eung
+pip install django djangorestframework django-cors-headers mysqlclient python-dotenv Pillow
 ```
 
 2. 환경 변수 설정:
+   - `.env.example` 파일을 `.env`로 복사하고 필요한 설정을 입력합니다.
 ```bash
 cp .env.example .env
 ```
 
-3. `.env` 파일의 환경 변수를 적절한 값으로 수정
-
-4. Docker Compose로 실행:
-```bash
-docker compose up --build
-```
-
-또는 로컬에서 SQLite로 실행:
+3. 데이터베이스 마이그레이션:
 ```bash
 cd Recommand
 python manage.py migrate
+```
+
+4. 관리자 계정 생성:
+```bash
+python manage.py createsuperuser
+```
+
+5. 샘플 레시피 데이터 로드:
+```bash
+python manage.py load_recipes
+```
+
+### 실행 방법
+
+개발 서버 실행:
+```bash
 python manage.py runserver
 ```
 
-## 인증
+서버는 기본적으로 http://127.0.0.1:8000/ 에서 실행됩니다.
 
-API는 Django REST framework의 세션 인증을 사용합니다:
+## API 엔드포인트
 
-1. `/api-auth/login/` 접속
-2. 로그인 정보 입력
-3. 인증된 세션으로 API 요청 가능
+### 기본 엔드포인트
+- API 루트: `/api/`
+- 관리자 인터페이스: `/admin/`
 
-## 추천 시스템
+### 레시피 관련 엔드포인트
+- 레시피 목록: `/api/recipes/`
+  - 난이도별 필터링: `/api/recipes/?difficulty=easy`
+  - 조리시간별 필터링: `/api/recipes/?max_time=30`
+- 카테고리: `/api/categories/`
+- 재료: `/api/ingredients/`
+- 조리도구: `/api/cooking-tools/`
 
-추천 시스템은 다음 요소들을 고려하여 게시글을 추천합니다:
-- 사용자가 좋아요한 게시글
-- 좋아요한 게시글의 태그
-- 좋아요한 게시글의 카테고리
-- 게시글 평점
-- 게시글 인기도(좋아요 수)
+### 장바구니 기능
+- 장바구니: `/api/cart/`
+- 장바구니 비우기: POST `/api/cart/clear/`
 
-게시글 순위 결정 요소:
-1. 관련성 점수(일치하는 태그와 카테고리)
-2. 평균 평점
-3. 좋아요 수
+### 추천 시스템
+- 사용자 선호도: `/api/preferences/`
+- 레시피 상호작용: `/api/recipe-interactions/`
+- 추천 받기: `/api/recommendations/`
 
-## 개발 환경
+## 디버깅
 
-### 요구사항
-- Python 3.12 이상
-- Django 4.2
-- Django REST framework
-- MySQL (Docker 설정용)
-- Docker 및 Docker Compose (선택사항)
+### 일반적인 문제 해결
 
-### 프로젝트 구조
+1. 서버가 시작되지 않는 경우:
+   - 포트가 이미 사용 중인지 확인
+   ```bash
+   pkill -f runserver
+   python manage.py runserver
+   ```
+   - 환경 변수가 제대로 설정되었는지 확인
+
+2. 데이터베이스 관련 오류:
+   - 마이그레이션이 제대로 적용되었는지 확인
+   ```bash
+   python manage.py showmigrations
+   python manage.py migrate
+   ```
+
+3. 정적 파일 로드 실패:
+   - 정적 파일 수집
+   ```bash
+   python manage.py collectstatic
+   ```
+
+### 로깅 설정
+
+`settings.py`에서 로깅 레벨을 DEBUG로 설정하여 자세한 로그를 확인할 수 있습니다:
+
+```python
+DEBUG = True
 ```
-Recommand/
-├── articles/                 # 메인 앱
-│   ├── models.py            # 데이터 모델
-│   ├── serializers.py       # API 시리얼라이저
-│   ├── views.py             # API 뷰
-│   └── admin.py             # 관리자 인터페이스
-├── Recommand/               # 프로젝트 설정
-│   ├── settings.py          # Django 설정
-│   └── urls.py              # URL 라우팅
-└── manage.py                # Django CLI
+
+### API 테스트
+
+1. 브라우저에서 테스트:
+   - Django REST Framework의 브라우저블 API 인터페이스 사용
+   - 각 엔드포인트에서 직접 API 테스트 가능
+
+2. 인증이 필요한 엔드포인트:
+   - 관리자 계정으로 로그인 필요
+   - 브라우저에서 `/admin/`으로 접속하여 로그인
+
+3. JSON 형식으로 응답 받기:
+   - URL 끝에 `?format=json` 추가
+   예: `http://127.0.0.1:8000/api/recipes/?format=json`
+
+## Docker 환경 (선택사항)
+
+Docker를 사용하여 실행하려면:
+
+```bash
+docker-compose up --build
+```
+
+## 주의사항
+
+- 개발 환경에서만 `DEBUG = True` 사용
+- 실제 운영 환경에서는 보안을 위해 `DEBUG = False`로 설정
+- 중요한 환경 변수는 반드시 `.env` 파일에 설정
+- API 키와 비밀번호는 절대 GitHub에 커밋하지 않도록 주의
